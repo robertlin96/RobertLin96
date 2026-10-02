@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World - 多國語言慶祝版</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 Canvas Confetti 動畫庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- 自訂一些額外的字體與動畫設定 -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Nunito', sans-serif;
+        }
+        /* 簡單的淡入動畫 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 min-h-screen flex items-center justify-center p-4 text-slate-800">
+
+    <main class="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-8 sm:p-12 max-w-2xl w-full text-center border border-white/50">
+        
+        <!-- 標題與問候語顯示區 -->
+        <div class="mb-10 min-h-[120px] flex flex-col justify-center">
+            <h1 id="greeting-text" class="text-5xl sm:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-violet-600 mb-4 drop-shadow-sm fade-in">
+                Hello, World!
+            </h1>
+            <p id="language-label" class="text-slate-500 font-bold uppercase tracking-widest text-sm">
+                English
+            </p>
+        </div>
+
+        <!-- 語言選擇區塊 -->
+        <div class="mb-10">
+            <p class="text-sm text-slate-400 mb-4">Choose a language / 選擇語言</p>
+            <div class="flex flex-wrap justify-center gap-2" id="lang-buttons">
+                <!-- 按鈕會由 JavaScript 動態生成或在這裡靜態定義 -->
+                <button onclick="changeLanguage('en')" class="lang-btn active px-4 py-2 rounded-full text-sm font-bold bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-200 shadow-sm">🇺🇸 English</button>
+                <button onclick="changeLanguage('zh')" class="lang-btn px-4 py-2 rounded-full text-sm font-bold bg-slate-100 text-slate-600 hover:bg-indigo-600 hover:text-white transition-colors border border-slate-200 shadow-sm">🇹🇼 繁體中文</button>
+                <button onclick="changeLanguage('ja')" class="lang-btn px-4 py-2 rounded-full text-sm font-bold bg-slate-100 text-slate-600 hover:bg-indigo-600 hover:text-white transition-colors border border-slate-200 shadow-sm">🇯🇵 日本語</button>
+                <button onclick="changeLanguage('es')" class="lang-btn px-4 py-2 rounded-full text-sm font-bold bg-slate-100 text-slate-600 hover:bg-indigo-600 hover:text-white transition-colors border border-slate-200 shadow-sm">🇪🇸 Español</button>
+                <button onclick="changeLanguage('fr')" class="lang-btn px-4 py-2 rounded-full text-sm font-bold bg-slate-100 text-slate-600 hover:bg-indigo-600 hover:text-white transition-colors border border-slate-200 shadow-sm">🇫🇷 Français</button>
+                <button onclick="changeLanguage('de')" class="lang-btn px-4 py-2 rounded-full text-sm font-bold bg-slate-100 text-slate-600 hover:bg-indigo-600 hover:text-white transition-colors border border-slate-200 shadow-sm">🇩🇪 Deutsch</button>
+                <button onclick="changeLanguage('ko')" class="lang-btn px-4 py-2 rounded-full text-sm font-bold bg-slate-100 text-slate-600 hover:bg-indigo-600 hover:text-white transition-colors border border-slate-200 shadow-sm">🇰🇷 한국어</button>
+            </div>
+        </div>
+
+        <!-- 慶祝按鈕區塊 -->
+        <div>
+            <button onclick="celebrate()" class="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-white transition-all duration-200 bg-gradient-to-r from-pink-500 to-orange-400 rounded-full hover:scale-105 hover:shadow-lg hover:shadow-pink-500/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500">
+                <span class="mr-2 text-xl group-hover:animate-bounce">🎉</span> 
+                Celebrate / 慶祝！
+            </button>
+        </div>
+    </main>
+
+    <script>
+        // 定義多國語言的資料字典
+        const translations = {
+            en: { text: "Hello, World!", label: "English" },
+            zh: { text: "你好，世界！", label: "繁體中文" },
+            ja: { text: "こんにちは、世界！", label: "日本語" },
+            es: { text: "¡Hola, Mundo!", label: "Español" },
+            fr: { text: "Bonjour, le monde !", label: "Français" },
+            de: { text: "Hallo, Welt!", label: "Deutsch" },
+            ko: { text: "안녕, 세상아!", label: "한국어" }
+        };
+
+        // 取得 DOM 元素
+        const greetingText = document.getElementById('greeting-text');
+        const languageLabel = document.getElementById('language-label');
+        const langButtons = document.querySelectorAll('.lang-btn');
+
+        // 切換語言功能
+        function changeLanguage(langCode) {
+            // 更新文字內容
+            const data = translations[langCode];
+            greetingText.textContent = data.text;
+            languageLabel.textContent = data.label;
+
+            // 重新觸發淡入動畫 (藉由移除並重新加入 class)
+            greetingText.classList.remove('fade-in');
+            void greetingText.offsetWidth; // 觸發 reflow 以重置動畫
+            greetingText.classList.add('fade-in');
+
+            // 更新按鈕的視覺狀態 (醒目提示當前選擇的語言)
+            langButtons.forEach(btn => {
+                // 檢查該按鈕的 onclick 屬性是否包含目前的 langCode
+                if (btn.getAttribute('onclick').includes(`'${langCode}'`)) {
+                    // 設定為啟用狀態的樣式
+                    btn.classList.remove('bg-slate-100', 'text-slate-600', 'border-slate-200');
+                    btn.classList.add('bg-indigo-100', 'text-indigo-700', 'border-indigo-200');
+                } else {
+                    // 還原為非啟用狀態的樣式
+                    btn.classList.remove('bg-indigo-100', 'text-indigo-700', 'border-indigo-200');
+                    btn.classList.add('bg-slate-100', 'text-slate-600', 'border-slate-200');
+                }
+            });
+        }
+
+        // 慶祝動畫功能 (使用 canvas-confetti)
+        function celebrate() {
+            // 基本的紙屑發射設定
+            var count = 200;
+            var defaults = {
+                origin: { y: 0.7 },
+                zIndex: 100
+            };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            // 發射不同樣式的紙屑，創造豐富的效果
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
+        }
+    </script>
+</body>
+</html>
