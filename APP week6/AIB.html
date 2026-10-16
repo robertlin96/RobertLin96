@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的行程與待辦清單</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            position: relative;
+            isolation: isolate;
+            background-color: #f7f3ec;
+            background-image:
+                radial-gradient(ellipse at 12% 18%, rgba(255, 188, 176, 0.5), transparent 27%),
+                radial-gradient(ellipse at 88% 14%, rgba(180, 164, 230, 0.46), transparent 30%),
+                radial-gradient(ellipse at 84% 88%, rgba(145, 207, 192, 0.42), transparent 28%),
+                repeating-linear-gradient(0deg, transparent 0 31px, rgba(112, 105, 139, 0.075) 31px 32px),
+                repeating-linear-gradient(90deg, transparent 0 31px, rgba(112, 105, 139, 0.075) 31px 32px);
+            background-attachment: fixed;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            z-index: -1;
+            top: 8%;
+            right: 4%;
+            width: 170px;
+            height: 170px;
+            background-image: radial-gradient(rgba(119, 96, 158, 0.32) 2px, transparent 2.5px);
+            background-size: 16px 16px;
+            mask-image: radial-gradient(circle, #000 20%, transparent 72%);
+            pointer-events: none;
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            z-index: -1;
+            left: -90px;
+            bottom: -115px;
+            width: 300px;
+            height: 300px;
+            border: 1px solid rgba(119, 96, 158, 0.2);
+            border-radius: 44% 56% 62% 38% / 43% 42% 58% 57%;
+            box-shadow: 0 0 0 18px rgba(255, 255, 255, 0.12), 0 0 0 38px rgba(119, 96, 158, 0.08);
+            transform: rotate(-24deg);
+            pointer-events: none;
+        }
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 600px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.94);
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            border-radius: 20px;
+            box-shadow: 0 20px 55px rgba(72, 61, 94, 0.16);
+            box-sizing: border-box;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .date-display {
+            text-align: center;
+            font-size: 1.1em;
+            color: #7f8c8d;
+            margin-bottom: 25px;
+            font-weight: 500;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        h2 {
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            color: #2980b9;
+            font-size: 1.2em;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        li {
+            background: #f9fbfb;
+            margin: 8px 0;
+            padding: 12px 15px;
+            border-left: 4px solid #bdc3c7;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        li.schedule-item {
+            border-left-color: #3498db;
+        }
+        li.todo-item {
+            border-left-color: #9b59b6;
+        }
+        .time-badge {
+            background: #3498db;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            margin-right: 10px;
+        }
+        .status {
+            font-size: 0.9em;
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+        .status-done {
+            background-color: #d5f5e3;
+            color: #27ae60;
+        }
+        .status-progress {
+            background-color: #fcf3cf;
+            color: #f1c40f;
+        }
+        .status-pending {
+            background-color: #fadbd8;
+            color: #c0392b;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        .form-group input[type="text"], .form-group input[type="time"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+        }
+        button {
+            background-color: #2ecc71;
+            color: white;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #27ae60;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            li {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .time-badge {
+                margin-bottom: 8px;
+            }
+            .status {
+                margin-top: 8px;
+                align-self: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>我的行程與待辦清單</h1>
+    <div class="date-display" id="current-date"></div>
+
+    <div class="section">
+        <h2>固定行程</h2>
+        <ul>
+            <li class="schedule-item">
+                <div><span class="time-badge">09:00</span> 微積分課程</div>
+            </li>
+            <li class="schedule-item">
+                <div><span class="time-badge">12:00</span> 午餐休息</div>
+            </li>
+            <li class="schedule-item">
+                <div><span class="time-badge">14:00</span> 會計學報告討論</div>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>待辦事項</h2>
+        <ul>
+            <li class="todo-item">
+                <div>完成英文提案簡報 (Gamma)</div>
+                <span class="status status-done">已完成</span>
+            </li>
+            <li class="todo-item">
+                <div>複習經濟學 (消費者剩餘與稅賦)</div>
+                <span class="status status-progress">進行中</span>
+            </li>
+            <li class="todo-item">
+                <div>購買洗面乳與 2% 水楊酸</div>
+                <span class="status status-pending">未開始</span>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>新增行程</h2>
+        <form onsubmit="event.preventDefault(); alert('此為前端表單外觀展示，無後端與資料庫連線。');">
+            <div class="form-group">
+                <label for="task-time">時間</label>
+                <input type="time" id="task-time" name="task-time" required>
+            </div>
+            <div class="form-group">
+                <label for="task-desc">行程內容</label>
+                <input type="text" id="task-desc" name="task-desc" placeholder="請輸入行程名稱..." required>
+            </div>
+            <button type="submit">新增至行程表</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const dateElement = document.getElementById('current-date');
+    const today = new Date();
+    const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+    dateElement.textContent = today.toLocaleDateString('zh-TW', options);
+</script>
+
+</body>
+</html>
