@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的行程與待辦清單</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background:
+                radial-gradient(circle at 8% 12%, rgba(255, 205, 220, 0.65) 0 95px, transparent 96px),
+                radial-gradient(circle at 92% 28%, rgba(207, 224, 255, 0.8) 0 125px, transparent 126px),
+                radial-gradient(circle at 18% 88%, rgba(255, 230, 175, 0.65) 0 115px, transparent 116px),
+                linear-gradient(135deg, #fff8f3, #f5f3ff 55%, #effbfa);
+            color: #413b55;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.94);
+            padding: 25px;
+            border: 1px solid rgba(226, 216, 245, 0.9);
+            border-radius: 24px;
+            box-shadow: 0 18px 45px rgba(103, 83, 137, 0.14);
+            box-sizing: border-box;
+        }
+        h1 {
+            text-align: center;
+            color: #51436f;
+            margin: 0 0 5px;
+        }
+        h1::before {
+            content: "CAMPUS PLANNER";
+            display: block;
+            margin-bottom: 8px;
+            color: #a17bc5;
+            font-size: 0.58em;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+        }
+        .date-display {
+            text-align: center;
+            font-size: 1.1em;
+            color: #81758f;
+            background: #f8f3ff;
+            border-radius: 999px;
+            width: fit-content;
+            margin: 0 auto 25px;
+            padding: 7px 16px;
+            font-weight: 500;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        h2 {
+            border-bottom: 2px solid #d9c7f0;
+            padding-bottom: 8px;
+            color: #765b9c;
+            font-size: 1.2em;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        li {
+            background: #fbf9ff;
+            margin: 8px 0;
+            padding: 12px 15px;
+            border-left: 4px solid #dfd8e8;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        li.schedule-item {
+            border-left-color: #8fc9c2;
+        }
+        li.todo-item {
+            border-left-color: #c19cde;
+        }
+        .time-badge {
+            background: #79bdb5;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            margin-right: 10px;
+        }
+        .status {
+            font-size: 0.9em;
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+        .status-done {
+            background-color: #d5f5e3;
+            color: #27ae60;
+        }
+        .status-progress {
+            background-color: #fff1c9;
+            color: #9a6a12;
+        }
+        .status-pending {
+            background-color: #ffe4e8;
+            color: #a84258;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #625675;
+        }
+        .form-group input[type="text"], .form-group input[type="time"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ded6e8;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #a987ca;
+            box-shadow: 0 0 0 3px rgba(169, 135, 202, 0.16);
+        }
+        button {
+            background-color: #a17bc5;
+            color: white;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #8965ad;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            li {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .time-badge {
+                margin-bottom: 8px;
+            }
+            .status {
+                margin-top: 8px;
+                align-self: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>我的行程與待辦清單</h1>
+    <div class="date-display" id="current-date"></div>
+
+    <div class="section">
+        <h2>固定行程</h2>
+        <ul>
+            <li class="schedule-item">
+                <div><span class="time-badge">09:00</span> 微積分課程</div>
+            </li>
+            <li class="schedule-item">
+                <div><span class="time-badge">12:00</span> 午餐休息</div>
+            </li>
+            <li class="schedule-item">
+                <div><span class="time-badge">14:00</span> 會計學報告討論</div>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>待辦事項</h2>
+        <ul>
+            <li class="todo-item">
+                <div>完成英文提案簡報 (Gamma)</div>
+                <span class="status status-done">已完成</span>
+            </li>
+            <li class="todo-item">
+                <div>複習經濟學 (消費者剩餘與稅賦)</div>
+                <span class="status status-progress">進行中</span>
+            </li>
+            <li class="todo-item">
+                <div>購買洗面乳與 2% 水楊酸</div>
+                <span class="status status-pending">未開始</span>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>新增行程</h2>
+        <form onsubmit="event.preventDefault(); alert('此為前端表單外觀展示，無後端與資料庫連線。');">
+            <div class="form-group">
+                <label for="task-time">時間</label>
+                <input type="time" id="task-time" name="task-time" required>
+            </div>
+            <div class="form-group">
+                <label for="task-desc">行程內容</label>
+                <input type="text" id="task-desc" name="task-desc" placeholder="請輸入行程名稱..." required>
+            </div>
+            <button type="submit">新增至行程表</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const dateElement = document.getElementById('current-date');
+    const today = new Date();
+    const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+    dateElement.textContent = today.toLocaleDateString('zh-TW', options);
+</script>
+
+</body>
+</html>
