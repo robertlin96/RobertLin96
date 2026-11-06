@@ -69,6 +69,10 @@
     .dot.lavender { background: #a799e9; }.dot.mint { background: #77b995; }.dot.yellow { background: #e7bd5d; }
     .day-event-label { max-width: 100%; overflow: hidden; color: #876c7b; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
     .calendar-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: .83rem; }
+    .sync-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+    .account-status { color: var(--muted); font-size: .78rem; }
+    .sync-account .button { min-height: 36px; padding: 7px 11px; font-size: .8rem; }
+    .sync-account .button[hidden] { display: none; }
     .legend { display: flex; flex-wrap: wrap; gap: 12px; }.legend span { display: flex; align-items: center; gap: 6px; }
     .side { display: grid; gap: 16px; }
     .agenda-panel, .focus-panel { padding: 20px; }
@@ -105,13 +109,14 @@
     .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
     .toast { position: fixed; right: 20px; bottom: 20px; z-index: 5; max-width: calc(100vw - 40px); padding: 12px 17px; border: 1px solid #f0dce5; border-radius: 14px; background: white; box-shadow: var(--shadow); color: var(--ink); opacity: 0; transform: translateY(10px); pointer-events: none; transition: .2s; }
     .toast.show { opacity: 1; transform: translateY(0); }
-    @media (max-width: 820px) { .layout { grid-template-columns: 1fr; }.side { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 820px) { .layout { grid-template-columns: 1fr; }.side { grid-template-columns: repeat(2,minmax(0,1fr)); } .calendar-foot { align-items: flex-start; flex-direction: column; } .sync-account { justify-content: flex-start; } }
     @media (max-width: 560px) {
       .app { width: min(100% - 24px, 520px); padding-top: 14px; }.topbar { margin-bottom: 17px; }.top-actions .button { min-height: 38px; padding: 7px 10px; font-size: .82rem; }
       .hero { align-items: flex-start; flex-direction: column; }.quote { max-width: none; width: 100%; padding: 11px 14px; }
       .calendar-panel { padding: 13px 10px; border-radius: 19px; }.calendar-head { padding: 0 4px; }.day { min-height: 70px; margin: 1px; padding: 5px 3px; border-radius: 11px; gap: 4px; }.day-number { width: 25px; height: 25px; font-size: .82rem; }.day-event-label { display: none; }.weekdays { font-size: .72rem; }
       .calendar-foot { align-items: flex-start; flex-direction: column; padding-left: 5px; }.side { grid-template-columns: 1fr; }
     }
+
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
   </style>
 </head>
@@ -148,7 +153,12 @@
         <div class="calendar-grid" id="calendarGrid" role="grid" aria-label="月曆"></div>
         <div class="calendar-foot">
           <div class="legend"><span><i class="dot"></i>約會/日常</span><span><i class="dot lavender"></i>工作/學習</span><span><i class="dot mint"></i>休息/照顧自己</span></div>
-          <span>你的日程只儲存在這台裝置 ♡</span>
+          <div class="sync-account" id="syncAccount" aria-live="polite">
+            <span class="account-status" id="accountStatus">目前以訪客模式使用</span>
+            <span class="account-status">Firebase 設定步驟：<a href="./FIREBASE_SETUP.md">設定說明</a></span>
+            <button class="button" id="googleSignIn" type="button">使用 Google 登入</button>
+            <button class="button" id="googleSignOut" type="button" hidden>登出</button>
+          </div>
         </div>
       </section>
 
@@ -183,7 +193,26 @@
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+    import { getFirestore, collection, doc, getDocs, onSnapshot, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+    // Firebase Console > Project settings > Your apps > Web app config: replace these values.
+    const firebaseConfig = {
+      apiKey: "YOUR_FIREBASE_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      appId: "YOUR_FIREBASE_APP_ID"
+    };
+    const firebaseReady = Object.values(firebaseConfig).every(value => value && !value.startsWith("YOUR_"));
+    let firebaseApp = null, auth = null, db = null;
+    if (firebaseReady) {
+      firebaseApp = initializeApp(firebaseConfig);
+      auth = getAuth(firebaseApp);
+      db = getFirestore(firebaseApp);
+    }
+
     (() => {
       const STORAGE_KEY = 'sweet-days-calendar-v1';
       const GOALS_KEY = 'sweet-days-goals-v1';
@@ -202,8 +231,74 @@
       const agenda = document.getElementById('agendaList');
       const toast = document.getElementById('toast');
       let toastTimer;
-      const save = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(events)); localStorage.setItem(GOALS_KEY, JSON.stringify(goals)); } catch { notify('瀏覽器儲存空間無法使用，請檢查設定。'); } };
+      let currentUser = null;
+      let remoteUnsubscribe = null;
+      let remoteGoalsUnsubscribe = null;
+      let saveQueue = Promise.resolve();
+      const accountStatus = document.getElementById('accountStatus');
+      const googleSignInButton = document.getElementById('googleSignIn');
+      const googleSignOutButton = document.getElementById('googleSignOut');
+      const saveLocal = () => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+          localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+        } catch { notify('瀏覽器儲存空間無法使用，請檢查設定。'); }
+      };
+      const save = () => {
+        saveLocal();
+        if (!currentUser || !db) return;
+        const userId = currentUser.uid;
+        const eventsCopy = events.map(item => ({...item}));
+        const goalsCopy = goals.map(item => ({...item}));
+        saveQueue = saveQueue.then(async () => {
+          if (!currentUser || currentUser.uid !== userId) return;
+          const batch = writeBatch(db);
+          for (const item of eventsCopy) batch.set(doc(db, 'users', userId, 'events', item.id), item);
+          for (const item of goalsCopy) batch.set(doc(db, 'users', userId, 'goals', item.id), item);
+          await batch.commit();
+        }).catch(error => { console.error('Firebase sync error:', error); notify('雲端同步失敗，請稍後再試。'); });
+      };
       function notify(text) { toast.textContent = text; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2500); }
+      function setAccountUI(user) {
+        currentUser=user||null;
+        accountStatus.textContent=user?'已登入：'+(user.displayName||user.email||'Google 帳戶'):(firebaseReady?'目前以訪客模式使用':'請先設定 Firebase 專案');
+        googleSignInButton.hidden=!!user;
+        googleSignOutButton.hidden=!user;
+        googleSignInButton.disabled=!firebaseReady;
+        if(!firebaseReady)googleSignInButton.title='請先填入 Firebase Web App 設定';
+      }
+      function showSignInError(error) {
+        console.error('Google sign-in error:',error);
+        const messages={'auth/unauthorized-domain':'此網站網域尚未加入 Firebase 授權網域。','auth/popup-closed-by-user':'登入視窗已關閉，尚未完成登入。','auth/popup-blocked':'瀏覽器封鎖了登入視窗，請允許彈出視窗後重試。','auth/operation-not-allowed':'請先在 Firebase Authentication 啟用 Google 登入。','permission-denied':'Firestore 權限不足，請檢查安全規則。'};
+        notify(messages[error.code]||'登入／同步失敗：'+(error.message||error.code||'請稍後重試'));
+      }
+      async function signInWithGoogle() {
+        if(!firebaseReady){notify('尚未設定 Firebase：請填入 Web App 設定，並啟用 Google 登入與 Firestore。');return;}
+        try{const provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});await signInWithPopup(auth,provider);}
+        catch(error){showSignInError(error);}
+      }
+      async function migrateAndWatchCloud(user) {
+        if(remoteUnsubscribe)remoteUnsubscribe();
+        if(remoteGoalsUnsubscribe)remoteGoalsUnsubscribe();
+        const userId=user.uid;
+        try{
+          const eventCollection=collection(db,'users',userId,'events');
+          const goalCollection=collection(db,'users',userId,'goals');
+          const [cloudEvents,cloudGoals]=await Promise.all([getDocs(eventCollection),getDocs(goalCollection)]);
+          if(!currentUser||currentUser.uid!==userId)return;
+          if(cloudEvents.empty&&events.length){const batch=writeBatch(db);events.forEach(item=>batch.set(doc(eventCollection,item.id),item));await batch.commit();}
+          else{events=cloudEvents.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(item.date));localStorage.setItem(STORAGE_KEY,JSON.stringify(events));}
+          if(cloudGoals.empty&&goals.length){const batch=writeBatch(db);goals.forEach(item=>batch.set(doc(goalCollection,item.id),item));await batch.commit();}
+          else{goals=cloudGoals.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.text==='string');localStorage.setItem(GOALS_KEY,JSON.stringify(goals));}
+          render();
+          remoteUnsubscribe=onSnapshot(eventCollection,snapshot=>{if(!currentUser||currentUser.uid!==userId)return;events=snapshot.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(item.date));localStorage.setItem(STORAGE_KEY,JSON.stringify(events));render();},showSignInError);
+          remoteGoalsUnsubscribe=onSnapshot(goalCollection,snapshot=>{if(!currentUser||currentUser.uid!==userId)return;goals=snapshot.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.text==='string');localStorage.setItem(GOALS_KEY,JSON.stringify(goals));renderGoals();},showSignInError);
+        }catch(error){showSignInError(error);}
+      }
+      googleSignInButton.addEventListener('click',signInWithGoogle);
+      googleSignOutButton.addEventListener('click',async()=>{try{if(remoteUnsubscribe)remoteUnsubscribe();if(remoteGoalsUnsubscribe)remoteGoalsUnsubscribe();remoteUnsubscribe=null;remoteGoalsUnsubscribe=null;await signOut(auth);notify('已登出 Google 帳戶');}catch(error){showSignInError(error);}});
+      setAccountUI(null);
+      if(firebaseReady)onAuthStateChanged(auth,user=>{setAccountUI(user);if(user)migrateAndWatchCloud(user);else{if(remoteUnsubscribe)remoteUnsubscribe();if(remoteGoalsUnsubscribe)remoteGoalsUnsubscribe();remoteUnsubscribe=null;remoteGoalsUnsubscribe=null;}});
       function renderCalendar() {
         document.getElementById('monthHeading').textContent = monthFmt.format(shownMonth);
         const y = shownMonth.getFullYear(), m = shownMonth.getMonth();
@@ -245,7 +340,7 @@
           const stripe=document.createElement('span'); stripe.className=`agenda-stripe ${['lavender','mint','yellow'].includes(e.category)?e.category:''}`;
           const body=document.createElement('div'); body.innerHTML=`<div class="agenda-name">${escapeHTML(e.title)}</div>${e.note?`<div class="agenda-note">${escapeHTML(e.note)}</div>`:''}`;
           const del=document.createElement('button'); del.className='delete-event'; del.type='button'; del.textContent='×'; del.setAttribute('aria-label',`刪除日程：${e.title}`);
-          del.addEventListener('click',()=>{events=events.filter(x=>x.id!==e.id);save();render();notify('已刪除這筆日程');});
+          del.addEventListener('click',async()=>{events=events.filter(x=>x.id!==e.id);save();if(currentUser&&db){try{await deleteDoc(doc(db,'users',currentUser.uid,'events',e.id));}catch(error){showSignInError(error);}}render();notify('已刪除這筆日程');});
           row.append(time,stripe,body,del); agenda.appendChild(row);
         }
       }
