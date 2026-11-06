@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#fff8fb">
-  <meta name="description" content="甜甜的每日行事曆：安排日程、記下待辦，留一點時間給自己。">
-  <title>甜日誌｜每日行事曆</title>
+  <meta name="description" content="每日日程：安排日程、記下待辦，留一點時間給自己。">
+  <title>每日日程｜每日行事曆</title>
   <style>
     :root {
       color-scheme: light;
@@ -118,7 +118,7 @@
 <body>
   <main class="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">🌷</span><span>甜日誌 <span style="color:var(--pink-dark)">·</span> little day planner</span></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">🌷</span><span>每日日程 <span style="color:var(--pink-dark)">·</span> little day planner</span></div>
       <div class="top-actions">
         <button class="button" id="todayButton" type="button">回到今天</button>
         <button class="button" id="exportButton" type="button" title="下載日程備份">下載備份</button>
@@ -270,9 +270,9 @@
       document.getElementById('addEventButton').addEventListener('click',()=>{form.reset();document.getElementById('eventDate').value=selectedDate;dialog.showModal();document.getElementById('eventTitle').focus();});
       document.getElementById('cancelDialog').addEventListener('click',()=>dialog.close());
       dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
-      form.addEventListener('submit',e=>{e.preventDefault();const data=new FormData(form);const title=String(data.get('title')||'').trim();const date=String(data.get('date')||'');if(!title||!/^\d{4}-\d{2}-\d{2}$/.test(date)){notify('請填寫日程名稱和有效日期');return;}events.push({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,title,date,time:String(data.get('time')||''),category:String(data.get('category')||'pink'),note:String(data.get('note')||'').trim()});selectedDate=date;const parsed=parseLocal(date);shownMonth=new Date(parsed.getFullYear(),parsed.getMonth(),1);save();dialog.close();render();notify('新日程已甜甜存好 ♡');});
+      form.addEventListener('submit',e=>{e.preventDefault();const data=new FormData(form);const title=String(data.get('title')||'').trim();const date=String(data.get('date')||'');if(!title||!/^\d{4}-\d{2}-\d{2}$/.test(date)){notify('請填寫日程名稱和有效日期');return;}events.push({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,title,date,time:String(data.get('time')||''),category:String(data.get('category')||'pink'),note:String(data.get('note')||'').trim()});selectedDate=date;const parsed=parseLocal(date);shownMonth=new Date(parsed.getFullYear(),parsed.getMonth(),1);save();dialog.close();render();notify('新日程已儲存 ♡');});
       document.getElementById('focusForm').addEventListener('submit',e=>{e.preventDefault();const input=document.getElementById('focusInput');const text=input.value.trim();if(!text)return;goals.push({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,text,done:false});input.value='';save();renderGoals();notify('已加入今日小目標 ✨');});
-      document.getElementById('exportButton').addEventListener('click',()=>{const payload={exportedAt:new Date().toISOString(),events,goals};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`甜日誌備份-${localISO(today)}.json`;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);notify('日程備份已下載');});
+      document.getElementById('exportButton').addEventListener('click',()=>{const payload={exportedAt:new Date().toISOString(),events,goals};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`每日日程備份-${localISO(today)}.json`;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);notify('日程備份已下載');});
       const quotes=['今天也留一點時間，給讓自己開心的小事 ☁️','不用趕路，慢慢來也會到達喜歡的地方 🌷','記得喝水，也記得稱讚努力生活的自己 ✨','今天的你，值得一個剛剛好的小休息 🍵','把日子過成喜歡的樣子，一點一點就好 ♡'];
       const dayOfYear=Math.floor((new Date(today.getFullYear(),today.getMonth(),today.getDate())-new Date(today.getFullYear(),0,0))/86400000);
       document.getElementById('dailyQuote').textContent=quotes[dayOfYear%quotes.length];
