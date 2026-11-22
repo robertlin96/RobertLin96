@@ -154,7 +154,7 @@
         <div class="calendar-foot">
           <div class="legend"><span><i class="dot"></i>約會/日常</span><span><i class="dot lavender"></i>工作/學習</span><span><i class="dot mint"></i>休息/照顧自己</span></div>
           <div class="sync-account" id="syncAccount" aria-live="polite">
-            <span class="account-status" id="accountStatus">目前以訪客模式使用</span>
+            <span class="account-status" id="accountStatus">目前以訪客模式使用，尚未登入雲端</span>
             <span class="account-status">Firebase 設定步驟：<a href="./FIREBASE_SETUP.md">設定說明</a></span>
             <button class="button" id="googleSignIn" type="button">使用 Google 登入</button>
             <button class="button" id="googleSignOut" type="button" hidden>登出</button>
@@ -198,12 +198,12 @@
     import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
     import { getFirestore, collection, doc, getDocs, onSnapshot, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-    // Firebase Console > Project settings > Your apps > Web app config: replace these values.
+    // Public Firebase Web App config for project daymark-99407.
     const firebaseConfig = {
-      apiKey: "YOUR_FIREBASE_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      appId: "YOUR_FIREBASE_APP_ID"
+      apiKey: "AIzaSyDWhvq6iu-OwdqJ5-fxPnAhp-lvEywGdlc",
+      authDomain: "daymark-99407.firebaseapp.com",
+      projectId: "daymark-99407",
+      appId: "1:430736091000:web:b4485a0cf10ddcb28bca8d"
     };
     const firebaseReady = Object.values(firebaseConfig).every(value => value && !value.startsWith("YOUR_"));
     let firebaseApp = null, auth = null, db = null;
@@ -214,17 +214,21 @@
     }
 
     (() => {
-      const STORAGE_KEY = 'sweet-days-calendar-v1';
-      const GOALS_KEY = 'sweet-days-goals-v1';
-      const today = new Date();
-      const localISO = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-      const parseLocal = (value) => { const [y,m,d] = value.split('-').map(Number); return new Date(y,m-1,d,12); };
-      const dateFmt = new Intl.DateTimeFormat('zh-TW', {year:'numeric',month:'long',day:'numeric',weekday:'long'});
-      const monthFmt = new Intl.DateTimeFormat('zh-TW', {year:'numeric',month:'long'});
-      const escapeHTML = (value) => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-      const readArray = (key) => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
-      let events = readArray(STORAGE_KEY).filter(e => e && typeof e.id === 'string' && typeof e.title === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date));
-      let goals = readArray(GOALS_KEY).filter(g => g && typeof g.id === 'string' && typeof g.text === 'string');
+      const LEGACY_STORAGE_KEY='sweet-days-calendar-v1';
+      const STORAGE_KEY='daymark-calendar-v1';
+      const LEGACY_GOALS_KEY='sweet-days-goals-v1';
+      const GOALS_KEY='daymark-goals-v1';
+      const today=new Date();
+      const localISO=(date)=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+      const parseLocal=(value)=>{const [y,m,d]=value.split('-').map(Number);return new Date(y,m-1,d,12);};
+      const dateFmt=new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+      const monthFmt=new Intl.DateTimeFormat('zh-TW',{year:'numeric',month:'long'});
+      const escapeHTML=(value)=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+      const readArray=(key)=>{try{const value=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(value)?value:[];}catch{return[];}};
+      if(!localStorage.getItem(STORAGE_KEY)&&localStorage.getItem(LEGACY_STORAGE_KEY)){try{localStorage.setItem(STORAGE_KEY,localStorage.getItem(LEGACY_STORAGE_KEY));}catch{}}
+      if(!localStorage.getItem(GOALS_KEY)&&localStorage.getItem(LEGACY_GOALS_KEY)){try{localStorage.setItem(GOALS_KEY,localStorage.getItem(LEGACY_GOALS_KEY));}catch{}}
+      let events=readArray(STORAGE_KEY).filter(e=>e&&typeof e.id==='string'&&typeof e.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(e.date));
+      let goals=readArray(GOALS_KEY).filter(g=>g&&typeof g.id==='string'&&typeof g.text==='string');
       let shownMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       let selectedDate = localISO(today);
       const grid = document.getElementById('calendarGrid');
@@ -232,6 +236,7 @@
       const toast = document.getElementById('toast');
       let toastTimer;
       let currentUser = null;
+      let cloudReady = false;
       let remoteUnsubscribe = null;
       let remoteGoalsUnsubscribe = null;
       let saveQueue = Promise.resolve();
@@ -246,25 +251,26 @@
       };
       const save = () => {
         saveLocal();
-        if (!currentUser || !db) return;
-        const userId = currentUser.uid;
-        const eventsCopy = events.map(item => ({...item}));
-        const goalsCopy = goals.map(item => ({...item}));
-        saveQueue = saveQueue.then(async () => {
-          if (!currentUser || currentUser.uid !== userId) return;
-          const batch = writeBatch(db);
-          for (const item of eventsCopy) batch.set(doc(db, 'users', userId, 'events', item.id), item);
-          for (const item of goalsCopy) batch.set(doc(db, 'users', userId, 'goals', item.id), item);
+        if (!currentUser || !db || !cloudReady) return;
+        const userId=currentUser.uid;
+        const eventCopy=events.map(item=>({...item}));
+        const goalCopy=goals.map(item=>({...item}));
+        saveQueue=saveQueue.then(async()=>{
+          if(!currentUser||currentUser.uid!==userId)return;
+          const batch=writeBatch(db);
+          for(const item of eventCopy)batch.set(doc(db,'users',userId,'events',item.id),item);
+          for(const item of goalCopy)batch.set(doc(db,'users',userId,'goals',item.id),item);
           await batch.commit();
-        }).catch(error => { console.error('Firebase sync error:', error); notify('雲端同步失敗，請稍後再試。'); });
+        }).catch(error=>{console.error('Firebase sync error:',error);notify('雲端同步失敗，請稍後再試。');});
       };
       function notify(text) { toast.textContent = text; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2500); }
       function setAccountUI(user) {
         currentUser=user||null;
-        accountStatus.textContent=user?'已登入：'+(user.displayName||user.email||'Google 帳戶'):(firebaseReady?'目前以訪客模式使用':'請先設定 Firebase 專案');
+        accountStatus.textContent=user?'已登入：'+(user.displayName||user.email||'Google 帳戶'):(firebaseReady?'目前以訪客模式使用，尚未登入雲端':'請先設定 Firebase 專案');
         googleSignInButton.hidden=!!user;
         googleSignOutButton.hidden=!user;
         googleSignInButton.disabled=!firebaseReady;
+        googleSignInButton.title=firebaseReady?'':'Firebase Web App 設定尚未完成';
         if(!firebaseReady)googleSignInButton.title='請先填入 Firebase Web App 設定';
       }
       function showSignInError(error) {
@@ -278,27 +284,45 @@
         catch(error){showSignInError(error);}
       }
       async function migrateAndWatchCloud(user) {
+        cloudReady=false;
         if(remoteUnsubscribe)remoteUnsubscribe();
         if(remoteGoalsUnsubscribe)remoteGoalsUnsubscribe();
         const userId=user.uid;
-        try{
+        try {
           const eventCollection=collection(db,'users',userId,'events');
           const goalCollection=collection(db,'users',userId,'goals');
           const [cloudEvents,cloudGoals]=await Promise.all([getDocs(eventCollection),getDocs(goalCollection)]);
           if(!currentUser||currentUser.uid!==userId)return;
-          if(cloudEvents.empty&&events.length){const batch=writeBatch(db);events.forEach(item=>batch.set(doc(eventCollection,item.id),item));await batch.commit();}
-          else{events=cloudEvents.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(item.date));localStorage.setItem(STORAGE_KEY,JSON.stringify(events));}
-          if(cloudGoals.empty&&goals.length){const batch=writeBatch(db);goals.forEach(item=>batch.set(doc(goalCollection,item.id),item));await batch.commit();}
-          else{goals=cloudGoals.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.text==='string');localStorage.setItem(GOALS_KEY,JSON.stringify(goals));}
+          if(cloudEvents.empty&&cloudGoals.empty) {
+            const batch=writeBatch(db);
+            events.forEach(item=>batch.set(doc(eventCollection,item.id),item));
+            goals.forEach(item=>batch.set(doc(goalCollection,item.id),item));
+            if(events.length||goals.length)await batch.commit();
+          } else {
+            if(!cloudEvents.empty)events=cloudEvents.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(item.date));
+            if(!cloudGoals.empty)goals=cloudGoals.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.text==='string');
+            localStorage.setItem(STORAGE_KEY,JSON.stringify(events));
+            localStorage.setItem(GOALS_KEY,JSON.stringify(goals));
+          }
+          if(!currentUser||currentUser.uid!==userId)return;
           render();
-          remoteUnsubscribe=onSnapshot(eventCollection,snapshot=>{if(!currentUser||currentUser.uid!==userId)return;events=snapshot.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(item.date));localStorage.setItem(STORAGE_KEY,JSON.stringify(events));render();},showSignInError);
-          remoteGoalsUnsubscribe=onSnapshot(goalCollection,snapshot=>{if(!currentUser||currentUser.uid!==userId)return;goals=snapshot.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.text==='string');localStorage.setItem(GOALS_KEY,JSON.stringify(goals));renderGoals();},showSignInError);
-        }catch(error){showSignInError(error);}
+          cloudReady=true;
+          remoteUnsubscribe=onSnapshot(eventCollection,snapshot=>{
+            if(!currentUser||currentUser.uid!==userId)return;
+            events=snapshot.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(item.date));
+            localStorage.setItem(STORAGE_KEY,JSON.stringify(events));render();
+          },showSignInError);
+          remoteGoalsUnsubscribe=onSnapshot(goalCollection,snapshot=>{
+            if(!currentUser||currentUser.uid!==userId)return;
+            goals=snapshot.docs.map(item=>item.data()).filter(item=>item&&typeof item.id==='string'&&typeof item.text==='string');
+            localStorage.setItem(GOALS_KEY,JSON.stringify(goals));renderGoals();
+          },showSignInError);
+        } catch(error) { showSignInError(error); }
       }
       googleSignInButton.addEventListener('click',signInWithGoogle);
-      googleSignOutButton.addEventListener('click',async()=>{try{if(remoteUnsubscribe)remoteUnsubscribe();if(remoteGoalsUnsubscribe)remoteGoalsUnsubscribe();remoteUnsubscribe=null;remoteGoalsUnsubscribe=null;await signOut(auth);notify('已登出 Google 帳戶');}catch(error){showSignInError(error);}});
+      googleSignOutButton.addEventListener('click',async()=>{try{cloudReady=false;if(remoteUnsubscribe)remoteUnsubscribe();if(remoteGoalsUnsubscribe)remoteGoalsUnsubscribe();remoteUnsubscribe=null;remoteGoalsUnsubscribe=null;await signOut(auth);notify('已登出 Google 帳戶');}catch(error){showSignInError(error);}});
       setAccountUI(null);
-      if(firebaseReady)onAuthStateChanged(auth,user=>{setAccountUI(user);if(user)migrateAndWatchCloud(user);else{if(remoteUnsubscribe)remoteUnsubscribe();if(remoteGoalsUnsubscribe)remoteGoalsUnsubscribe();remoteUnsubscribe=null;remoteGoalsUnsubscribe=null;}});
+      if(firebaseReady)onAuthStateChanged(auth,user=>{setAccountUI(user);if(user)migrateAndWatchCloud(user);else{cloudReady=false;if(remoteUnsubscribe)remoteUnsubscribe();if(remoteGoalsUnsubscribe)remoteGoalsUnsubscribe();remoteUnsubscribe=null;remoteGoalsUnsubscribe=null;}});
       function renderCalendar() {
         document.getElementById('monthHeading').textContent = monthFmt.format(shownMonth);
         const y = shownMonth.getFullYear(), m = shownMonth.getMonth();
@@ -340,7 +364,7 @@
           const stripe=document.createElement('span'); stripe.className=`agenda-stripe ${['lavender','mint','yellow'].includes(e.category)?e.category:''}`;
           const body=document.createElement('div'); body.innerHTML=`<div class="agenda-name">${escapeHTML(e.title)}</div>${e.note?`<div class="agenda-note">${escapeHTML(e.note)}</div>`:''}`;
           const del=document.createElement('button'); del.className='delete-event'; del.type='button'; del.textContent='×'; del.setAttribute('aria-label',`刪除日程：${e.title}`);
-          del.addEventListener('click',async()=>{events=events.filter(x=>x.id!==e.id);save();if(currentUser&&db){try{await deleteDoc(doc(db,'users',currentUser.uid,'events',e.id));}catch(error){showSignInError(error);}}render();notify('已刪除這筆日程');});
+          del.addEventListener('click',async()=>{events=events.filter(x=>x.id!==e.id);save();if(currentUser&&db&&cloudReady){try{await deleteDoc(doc(db,'users',currentUser.uid,'events',e.id));}catch(error){showSignInError(error);}}render();notify('已刪除這筆日程');});
           row.append(time,stripe,body,del); agenda.appendChild(row);
         }
       }
