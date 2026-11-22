@@ -34,3 +34,8 @@ service cloud.firestore {
 提交並推送更新後，開啟 GitHub Pages，按「使用 Google 登入」。首次登入時，若該 Google 帳戶的 Firestore 使用者目錄還是空的，頁面會把這個瀏覽器目前的本機日程和目標遷移至該帳戶。之後新增、勾選或刪除內容會同步到登入帳戶。登出後雲端資料仍保留在該帳戶，訪客模式則繼續使用本機資料。
 
 > Firebase 設定值會隨靜態前端公開；安全邊界是 Authentication 與 Firestore Rules。不要把 Service Account JSON、Admin SDK 私鑰、OAuth client secret 或其他伺服器憑證放進前端或 GitHub。
+
+
+## LINE 登入（尚待後端設定）
+
+目前網站使用 Firebase Authentication 與 Firestore。若需安全接入 LINE Login 並同步至同一 Firebase 帳戶，需先設定 LINE Developers Login channel、HTTPS callback URL，並部署驗證 LINE 回傳資料及簽發 Firebase custom token 的可信任後端（例如 Cloud Functions）。不可將 LINE channel secret、服務帳戶私鑰或 token 簽發邏輯放在 index.html。完成後再將 LINE identity 安全連結到 Firebase 使用者，避免同一人因 Google／LINE 使用不同 UID 而資料分離。
